@@ -2554,21 +2554,32 @@ def create_app(args):
 
         Supports:
         - ``path``: local filesystem path (relative to _parsed_root)
-        - ``url``: remote URL (fetched with MinIO auth if applicable, then streamed back)
+        - ``url``: remote URL (fetched via MinIO SDK auth, then streamed back)
         """
-        import httpx
-        from base64 import b64encode
-
         if url:
             try:
-                import os
-                minio_user = os.getenv("MINIO_ACCESS_KEY", "admin")
-                minio_pass = os.getenv("MINIO_SECRET_KEY", "Superv@1")
-                auth_raw = f"{minio_user}:{minio_pass}"
-                headers = {"Authorization": f"Basic {b64encode(auth_raw.encode()).decode()}"}
+                import io
+                from urllib.parse import urlparse
 
+                parsed = urlparse(url)
+                if parsed.scheme in ("http", "https"):
+                    from lightrag.kg.minio_storage import _get_minio_client
+                    client = _get_minio_client()
+                    if client:
+                        # Extract bucket and object from URL
+                        obj_path = parsed.path.lstrip("/")
+                        parts = obj_path.split("/", 1)
+                        if len(parts) == 2:
+                            bucket, obj_name = parts
+                            data = client.get_object(bucket, obj_name)
+                            return Response(
+                                content=data.read(),
+                                media_type=data.headers.get("Content-Type", "image/png")
+                            )
+                # Fallback: httpx for non-MinIO URLs
+                import httpx
                 async with httpx.AsyncClient(timeout=30) as client:
-                    r = await client.get(url, headers=headers)
+                    r = await client.get(url)
                     r.raise_for_status()
                     content_type = r.headers.get("content-type", "image/png")
                     return Response(content=r.content, media_type=content_type)
