@@ -4480,7 +4480,7 @@ async def _perform_kg_search(
                         description = img.get('caption', '') or img.get('description', '')
                         ocr_text = img.get('ocr_text', '') or img.get('description', '')
 
-                        vector_chunks.append({
+                        vector_chunks.insert(0, {
                             "content": (
                                 f"\n\n**📷 Image — include this image using `![描述](URL)`:**\n\n"
                                 f"URL: {img_url}\n\n"
