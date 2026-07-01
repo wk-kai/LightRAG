@@ -2544,7 +2544,6 @@ def create_app(args):
             return RedirectResponse(url=f"{root}/docs")
 
     # --- Sidecar image serving endpoint ---
-    from fastapi.responses import FileResponse
     from fastapi import HTTPException
 
     _parsed_root = Path(args.input_dir).resolve() / "__parsed__"

@@ -10,6 +10,9 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
 # uv (with mirror for China)
 RUN pip install uv -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
+# Pre-install ollama (fails at runtime if done via pipmaster)
+RUN pip install ollama -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+
 # bun
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:$PATH"
