@@ -10,9 +10,6 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
 # uv (with mirror for China)
 RUN pip install uv -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
-# Pre-install ollama (fails at runtime if done via pipmaster)
-RUN pip install ollama -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
-
 # bun
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:$PATH"
@@ -24,6 +21,8 @@ COPY pyproject.toml uv.lock ./
 
 # --- Python deps ---
 RUN uv sync --extra api --extra offline-storage --no-dev
+# Force install ollama + minio into venv (pipmaster fails at runtime in Docker)
+RUN uv pip install ollama minio -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
 # --- Frontend ---
 COPY lightrag_webui/package.json lightrag_webui/bun.lock* lightrag_webui/
