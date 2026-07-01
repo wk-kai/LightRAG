@@ -2554,13 +2554,25 @@ def create_app(args):
 
         Supports:
         - ``path``: local filesystem path (relative to _parsed_root)
-        - ``url``: remote URL (MinIO etc., fetched and streamed back)
+        - ``url``: remote URL (fetched with MinIO auth if applicable, then streamed back)
         """
         import httpx
+        from base64 import b64encode
+
         if url:
             try:
+                import os
+                minio_endpoint = os.getenv("MINIO_ENDPOINT", "")
+                minio_user = os.getenv("MINIO_ACCESS_KEY", "admin")
+                minio_pass = os.getenv("MINIO_SECRET_KEY", "Superv@1")
+
+                headers = {}
+                if minio_endpoint and minio_endpoint in url:
+                    auth_raw = f"{minio_user}:{minio_pass}"
+                    headers["Authorization"] = f"Basic {b64encode(auth_raw.encode()).decode()}"
+
                 async with httpx.AsyncClient(timeout=30) as client:
-                    r = await client.get(url)
+                    r = await client.get(url, headers=headers)
                     r.raise_for_status()
                     content_type = r.headers.get("content-type", "image/png")
                     return Response(content=r.content, media_type=content_type)
