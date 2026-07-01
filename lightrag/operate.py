@@ -4482,9 +4482,10 @@ async def _perform_kg_search(
 
                         vector_chunks.append({
                             "content": (
-                                f"\n\n**📷 Relevant Image (include this image in your response using Markdown syntax below):**\n\n"
+                                f"\n\n**📷 Image — include this image using `![描述](URL)`:**\n\n"
+                                f"URL: {img_url}\n\n"
                                 f"![{caption[:200]}]({img_url})\n\n"
-                                f"*Image content: {description[:300]}*\n\n"
+                                f"*Caption: {description[:300]}*\n\n"
                             ) if img_path else (
                                 f"[Image] - {caption} {description}"
                             ),
