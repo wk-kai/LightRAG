@@ -2562,14 +2562,10 @@ def create_app(args):
         if url:
             try:
                 import os
-                minio_endpoint = os.getenv("MINIO_ENDPOINT", "")
                 minio_user = os.getenv("MINIO_ACCESS_KEY", "admin")
                 minio_pass = os.getenv("MINIO_SECRET_KEY", "Superv@1")
-
-                headers = {}
-                if minio_endpoint and minio_endpoint in url:
-                    auth_raw = f"{minio_user}:{minio_pass}"
-                    headers["Authorization"] = f"Basic {b64encode(auth_raw.encode()).decode()}"
+                auth_raw = f"{minio_user}:{minio_pass}"
+                headers = {"Authorization": f"Basic {b64encode(auth_raw.encode()).decode()}"}
 
                 async with httpx.AsyncClient(timeout=30) as client:
                     r = await client.get(url, headers=headers)
