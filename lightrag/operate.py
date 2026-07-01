@@ -4488,10 +4488,7 @@ async def _perform_kg_search(
 
                         vector_chunks.insert(0, {
                             "content": (
-                                f"\n\n**📷 Image — include this image using `![描述](URL)`:**\n\n"
-                                f"URL: {img_url}\n\n"
-                                f"![{caption[:200]}]({img_url})\n\n"
-                                f"*Caption: {description[:300]}*\n\n"
+                                f"![{caption[:200]}]({img_url})"
                             ) if img_path else (
                                 f"[Image] - {caption} {description}"
                             ),
