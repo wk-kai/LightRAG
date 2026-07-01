@@ -4459,14 +4459,10 @@ async def _perform_kg_search(
         # Get matched images from images_vdb (all modes)
         if images_vdb is not None:
             try:
-                import logging
-                _logger = logging.getLogger(__name__)
-                _logger.info(f"Searching images_vdb for query '{query[:50]}' top_k={query_param.chunk_top_k or 5}")
                 image_results = await images_vdb.query(
                     query, top_k=query_param.chunk_top_k or 5,
                     query_embedding=query_embedding
                 )
-                _logger.info(f"images_vdb found {len(image_results) if image_results else 0} results")
                 if image_results:
                     for img in image_results:
                         from urllib.parse import quote
