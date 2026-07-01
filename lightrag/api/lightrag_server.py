@@ -2571,11 +2571,16 @@ def create_app(args):
                         parts = obj_path.split("/", 1)
                         if len(parts) == 2:
                             bucket, obj_name = parts
-                            data = client.get_object(bucket, obj_name)
-                            return Response(
-                                content=data.read(),
-                                media_type=data.headers.get("Content-Type", "image/png")
-                            )
+                            try:
+                                data = client.get_object(bucket, obj_name)
+                                content_type = data.headers.get("Content-Type", "image/png")
+                                return Response(
+                                    content=data.read(),
+                                    media_type=content_type
+                                )
+                            except Exception as fetch_err:
+                                logger.error(f"MinIO get_object failed: {fetch_err}")
+                                raise
                 # Fallback: httpx for non-MinIO URLs
                 import httpx
                 async with httpx.AsyncClient(timeout=30) as client:
