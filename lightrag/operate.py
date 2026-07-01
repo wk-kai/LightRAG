@@ -4469,10 +4469,16 @@ async def _perform_kg_search(
 
                         img_path = img.get('image_path', '')
                         # Use /sidecar/image proxy to avoid CORS issues with remote images
-                        if img_path.startswith("http"):
-                            from urllib.parse import quote
+                        if img_path.startswith("minio://"):
+                            # Logical path — resolve with current MINIO_ENDPOINT
+                            from lightrag.kg.minio_storage import resolve_minio_url
+                            full_url = resolve_minio_url(img_path)
+                            img_url = f"/sidecar/image?url={quote(full_url, safe='')}"
+                        elif img_path.startswith("http"):
+                            # Legacy full URL (backward compat)
                             img_url = f"/sidecar/image?url={quote(img_path, safe='')}"
                         elif img_path:
+                            # Local filesystem path
                             img_url = f"/sidecar/image?path={quote(img_path, safe='')}"
                         else:
                             img_url = ""

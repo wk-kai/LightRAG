@@ -84,10 +84,12 @@ def upload_image(local_path: str | Path, object_name: Optional[str] = None) -> O
             str(path),
             content_type=content_type,
         )
-        endpoint = os.getenv("MINIO_ENDPOINT", "106.15.102.66:9000")
-        url = f"http://{endpoint}/{_minio_bucket}/{object_name}"
-        logger.debug(f"Uploaded to MinIO: {url}")
-        return url
+        # Return logical path, not a full URL — endpoint is resolved at query time
+        # from the current MINIO_ENDPOINT env var so the same data works across
+        # different hosts (local Docker, remote server, etc.).
+        logical_path = f"minio://{_minio_bucket}/{object_name}"
+        logger.debug(f"Uploaded to MinIO: {logical_path}")
+        return logical_path
     except Exception as e:
         logger.warning(f"MinIO upload failed for {local_path}: {e}")
         return None
@@ -127,6 +129,19 @@ def is_minio_available() -> bool:
     """Check if MinIO is connected."""
     _get_minio_client()
     return _minio_available is True
+
+
+def resolve_minio_url(logical_path: str) -> str:
+    """Resolve a ``minio://bucket/object`` logical path to a full HTTP URL.
+
+    Uses the current ``MINIO_ENDPOINT`` env var so the same stored data works
+    across different deployments.
+    """
+    if not logical_path.startswith("minio://"):
+        return logical_path
+    path = logical_path[len("minio://"):]
+    endpoint = os.getenv("MINIO_ENDPOINT", "106.15.102.66:9000")
+    return f"http://{endpoint}/{path}"
 
 
 def _guess_content_type(path: Path) -> str:
