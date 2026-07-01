@@ -8,6 +8,7 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     && rm -rf /var/lib/apt/lists/*
 
 # uv (use Aliyun mirror for China)
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 RUN pip install uv
 
