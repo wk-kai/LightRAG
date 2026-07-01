@@ -359,6 +359,7 @@ Consider the conversation history if provided to maintain conversational flow an
   - The response MUST be in the same language as the user query.
   - The response MUST utilize Markdown formatting for enhanced clarity and structure (e.g., headings, bold text, bullet points).
   - The response should be presented in {response_type}.
+  - When the **Context** contains image references using Markdown image syntax (`![description](url)`), you MUST include the most relevant images in your response. Place them after the relevant paragraph they illustrate. Use the exact same `![description](url)` syntax from the context — do not modify the URL.
 
 4. References Section Format:
   - The References section should be under heading: `### References`
@@ -413,6 +414,7 @@ Consider the conversation history if provided to maintain conversational flow an
   - The response MUST be in the same language as the user query.
   - The response MUST utilize Markdown formatting for enhanced clarity and structure (e.g., headings, bold text, bullet points).
   - The response should be presented in {response_type}.
+  - When the **Context** contains image references using Markdown image syntax (`![description](url)`), you MUST include the most relevant images in your response.
 
 4. References Section Format:
   - The References section should be under heading: `### References`

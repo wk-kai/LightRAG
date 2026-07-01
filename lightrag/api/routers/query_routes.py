@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class QueryRequest(BaseModel):
     query: str = Field(
-        min_length=3,
+        min_length=1,
         description="The query text",
     )
 
@@ -421,6 +421,12 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             if not response_content:
                 response_content = "No relevant context found for the query."
 
+            # Append images found in context directly to response (bypass LLM)
+            chunks = data.get("chunks", [])
+            image_mds = [c["content"] for c in chunks if c.get("source_type") == "image" and c.get("image_path") and "![" in c.get("content","")]
+            if image_mds:
+                response_content = response_content + "\n\n---\n" + "\n\n".join(image_mds)
+
             # Enrich references with chunk content if requested
             if request.include_references and request.include_chunk_content:
                 chunks = data.get("chunks", [])
@@ -503,11 +509,23 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     except Exception as e:
                         logger.error(f"Streaming error: {str(e)}")
                         yield f"{json.dumps({'error': str(e)})}\n"
+
+                # After stream, yield image chunks found in context
+                chunks = result.get("data", {}).get("chunks", [])
+                for c in chunks:
+                    if c.get("source_type") == "image" and c.get("image_path") and "![" in c.get("content", ""):
+                        yield f"{json.dumps({'response': c['content']})}\n"
             else:
                 # Non-streaming: complete response in one message
                 response_content = llm_response.get("content", "")
                 if not response_content:
                     response_content = "No relevant context found for the query."
+
+                # Append images found in context directly to response
+                chunks = result.get("data", {}).get("chunks", [])
+                image_mds = [c["content"] for c in chunks if c.get("source_type") == "image" and c.get("image_path") and "![" in c.get("content","")]
+                if image_mds:
+                    response_content = response_content + "\n\n---\n" + "\n\n".join(image_mds)
 
                 complete_response = {"response": response_content}
                 if include_references:

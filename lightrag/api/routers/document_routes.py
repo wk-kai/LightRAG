@@ -3126,6 +3126,7 @@ def create_document_routes(
                 rag.entities_vdb,
                 rag.relationships_vdb,
                 rag.chunks_vdb,
+                rag.images_vdb,
                 rag.chunk_entity_relation_graph,
                 rag.doc_status,
             ]
@@ -3135,6 +3136,19 @@ def create_document_routes(
                 pipeline_status["history_messages"].append(
                     "Starting to drop storage components"
                 )
+
+            # Clean MinIO images before dropping storages
+            try:
+                from lightrag.kg.minio_storage import delete_images_by_prefix, is_minio_available
+                if is_minio_available():
+                    deleted = delete_images_by_prefix("")
+                    if deleted:
+                        log_msg = f"Deleted {deleted} images from MinIO"
+                        logger.info(log_msg)
+                        if "history_messages" in pipeline_status:
+                            pipeline_status["history_messages"].append(log_msg)
+            except Exception as minio_err:
+                logger.warning(f"MinIO cleanup failed: {minio_err}")
 
             for storage in storages:
                 if storage is not None:

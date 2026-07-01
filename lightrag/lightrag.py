@@ -1180,6 +1180,13 @@ class LightRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
             embedding_func=self.embedding_func,
             meta_fields={"full_doc_id", "content", "file_path"},
         )
+        self.images_vdb: BaseVectorStorage = self.vector_db_storage_cls(  # type: ignore
+            namespace=NameSpace.VECTOR_STORE_IMAGES,
+            workspace=self.workspace,
+            embedding_func=self.embedding_func,
+            meta_fields={"doc_id", "file_path", "image_path", "caption",
+                         "description", "image_type"},
+        )
 
         # Initialize document status storage
         self.doc_status: DocStatusStorage = self.doc_status_storage_cls(
@@ -1297,6 +1304,7 @@ class LightRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                 self.entities_vdb,
                 self.relationships_vdb,
                 self.chunks_vdb,
+                self.images_vdb,
                 self.chunk_entity_relation_graph,
                 self.llm_response_cache,
                 self.doc_status,
@@ -1321,6 +1329,7 @@ class LightRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                 ("entities_vdb", self.entities_vdb),
                 ("relationships_vdb", self.relationships_vdb),
                 ("chunks_vdb", self.chunks_vdb),
+                ("images_vdb", self.images_vdb),
                 ("chunk_entity_relation_graph", self.chunk_entity_relation_graph),
                 ("llm_response_cache", self.llm_response_cache),
                 ("doc_status", self.doc_status),
@@ -1605,6 +1614,7 @@ class LightRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                 self.entities_vdb,
                 self.relationships_vdb,
                 self.chunks_vdb,
+                self.images_vdb,
                 self.chunk_entity_relation_graph,
             ]
             if storage_inst is not None
@@ -2279,6 +2289,7 @@ class LightRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                 hashing_kv=self.llm_response_cache,
                 system_prompt=None,
                 chunks_vdb=self.chunks_vdb,
+                images_vdb=self.images_vdb,
             )
         elif data_param.mode == "naive":
             logger.debug(f"[aquery_data] Using naive_query for mode: {data_param.mode}")
@@ -2377,6 +2388,7 @@ class LightRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                     hashing_kv=self.llm_response_cache,
                     system_prompt=system_prompt,
                     chunks_vdb=self.chunks_vdb,
+                    images_vdb=self.images_vdb,
                 )
             elif param.mode == "naive":
                 query_result = await naive_query(
@@ -2967,6 +2979,29 @@ class LightRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
         except Exception as e:
             logger.error(f"[purge] Failed to delete chunks for {doc_id}: {e}")
             raise Exception(f"Failed to delete document chunks: {e}") from e
+
+        # ---- 3b. Delete images associated with this document ----
+        try:
+            from qdrant_client import QdrantClient
+            from qdrant_client.http import models as qmodels
+            # Use Qdrant directly to filter by doc_id payload
+            img_collection = f"lightrag_vdb_images"
+            qdrant = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+            qdrant.delete(
+                collection_name=img_collection,
+                points_selector=qmodels.FilterSelector(
+                    filter=qmodels.Filter(
+                        must=[qmodels.FieldCondition(
+                            key="doc_id", match=qmodels.MatchValue(value=doc_id)
+                        )]
+                    )
+                ),
+            )
+            logger.info(f"[purge] {doc_id}: deleted images from Qdrant")
+        except Exception as e:
+            logger.warning(
+                f"[purge] Failed to delete images for {doc_id}: {e}"
+            )
 
         # ---- 4. Delete relationships with no remaining sources ----
         if relationships_to_delete:

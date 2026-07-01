@@ -3794,6 +3794,7 @@ async def kg_query(
     hashing_kv: BaseKVStorage | None = None,
     system_prompt: str | None = None,
     chunks_vdb: BaseVectorStorage = None,
+    images_vdb: BaseVectorStorage = None,
 ) -> QueryResult | None:
     """
     Execute knowledge graph query and return unified QueryResult object.
@@ -3867,6 +3868,7 @@ async def kg_query(
         text_chunks_db,
         query_param,
         chunks_vdb,
+        images_vdb,
     )
 
     if context_result is None:
@@ -4322,6 +4324,7 @@ async def _perform_kg_search(
     text_chunks_db: BaseKVStorage,
     query_param: QueryParam,
     chunks_vdb: BaseVectorStorage = None,
+    images_vdb: BaseVectorStorage = None,
 ) -> dict[str, Any]:
     """
     Pure search logic that retrieves raw entities, relations, and vector chunks.
@@ -4452,6 +4455,47 @@ async def _perform_kg_search(
                     }
                 else:
                     logger.warning(f"Vector chunk missing chunk_id: {chunk}")
+
+        # Get matched images from images_vdb (all modes)
+        if images_vdb is not None:
+            try:
+                image_results = await images_vdb.query(
+                    query, top_k=query_param.chunk_top_k or 5,
+                    query_embedding=query_embedding
+                )
+                if image_results:
+                    for img in image_results:
+                        from urllib.parse import quote
+
+                        img_path = img.get('image_path', '')
+                        # Use /sidecar/image proxy to avoid CORS issues with remote images
+                        if img_path.startswith("http"):
+                            from urllib.parse import quote
+                            img_url = f"/sidecar/image?url={quote(img_path, safe='')}"
+                        elif img_path:
+                            img_url = f"/sidecar/image?path={quote(img_path, safe='')}"
+                        else:
+                            img_url = ""
+                        caption = img.get('caption', '') or img.get('description', '') or 'Image'
+                        description = img.get('caption', '') or img.get('description', '')
+                        ocr_text = img.get('ocr_text', '') or img.get('description', '')
+
+                        vector_chunks.append({
+                            "content": (
+                                f"\n\n**📷 Relevant Image (include this image in your response using Markdown syntax below):**\n\n"
+                                f"![{caption[:200]}]({img_url})\n\n"
+                                f"*Image content: {description[:300]}*\n\n"
+                            ) if img_path else (
+                                f"[Image] - {caption} {description}"
+                            ),
+                            "created_at": img.get("created_at"),
+                            "file_path": img.get("file_path", "unknown_source"),
+                            "source_type": "image",
+                            "chunk_id": img.get("id"),
+                            "image_path": img.get("image_path", ""),
+                        })
+            except Exception as e:
+                logger.warning(f"Image search failed: {e}")
 
     # Round-robin merge entities
     final_entities = []
@@ -4792,6 +4836,8 @@ async def _merge_all_chunks(
                         "content": chunk["content"],
                         "file_path": chunk.get("file_path", "unknown_source"),
                         "chunk_id": chunk_id,
+                        "image_path": chunk.get("image_path", ""),
+                        "source_type": chunk.get("source_type", ""),
                     }
                 )
 
@@ -5031,6 +5077,7 @@ async def _build_query_context(
     text_chunks_db: BaseKVStorage,
     query_param: QueryParam,
     chunks_vdb: BaseVectorStorage = None,
+    images_vdb: BaseVectorStorage = None,
 ) -> QueryContextResult | None:
     """
     Main query context building function using the new 4-stage architecture:
@@ -5054,6 +5101,7 @@ async def _build_query_context(
         text_chunks_db,
         query_param,
         chunks_vdb,
+        images_vdb,  # ← image search inside _perform_kg_search
     )
 
     if not search_result["final_entities"] and not search_result["final_relations"]:

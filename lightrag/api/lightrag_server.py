@@ -2543,6 +2543,41 @@ def create_app(args):
             root = request.scope.get("root_path", "")
             return RedirectResponse(url=f"{root}/docs")
 
+    # --- Sidecar image serving endpoint ---
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException
+
+    _parsed_root = Path(args.input_dir).resolve() / "__parsed__"
+
+    @app.get("/sidecar/image")
+    async def serve_sidecar_image(path: str = "", url: str = ""):
+        """Serve a document image.
+
+        Supports:
+        - ``path``: local filesystem path (relative to _parsed_root)
+        - ``url``: remote URL (MinIO etc., fetched and streamed back)
+        """
+        import httpx
+        if url:
+            try:
+                async with httpx.AsyncClient(timeout=30) as client:
+                    r = await client.get(url)
+                    r.raise_for_status()
+                    content_type = r.headers.get("content-type", "image/png")
+                    return Response(content=r.content, media_type=content_type)
+            except Exception as e:
+                raise HTTPException(status_code=404, detail=f"Image fetch failed: {e}")
+        if not path:
+            raise HTTPException(status_code=400, detail="Missing 'path' or 'url' query parameter")
+        image_path = Path(path).resolve()
+        try:
+            image_path.relative_to(_parsed_root.resolve())
+        except ValueError:
+            raise HTTPException(status_code=403, detail="Access denied")
+        if not image_path.is_file():
+            raise HTTPException(status_code=404, detail="Image not found")
+        return FileResponse(image_path, media_type="image/png")
+
     return app
 
 

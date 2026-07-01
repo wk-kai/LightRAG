@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from lightrag.constants import DOCLING_RAW_DIR_SUFFIX, PARSER_ENGINE_DOCLING
 from lightrag.parser.external._base import ExternalParserBase
+from lightrag.utils import logger
 
 if TYPE_CHECKING:
     from lightrag.sidecar.ir import IRDoc
@@ -55,7 +56,7 @@ class DoclingParser(ExternalParserBase):
 
     def validate_ir(self, ir: "IRDoc", *, file_path: str, raw_dir: Path) -> None:
         if not ir.blocks:
-            raise ValueError(
+            logger.warning(
                 f"Docling IR builder produced zero blocks for {file_path} "
-                f"(raw_dir={raw_dir})"
+                f"(raw_dir={raw_dir}). Document will be treated as empty (no text)."
             )

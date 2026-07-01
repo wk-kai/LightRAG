@@ -709,7 +709,10 @@ def resolve_sidecar_uri(uri: str | None) -> Path | None:
     parts = urlsplit(uri)
     if parts.scheme != "file":
         return None
-    path_str = unquote(parts.path)
+    # On Windows, ``file://C:\path`` puts the drive letter into ``netloc``
+    # and leaves ``path`` as ``/``; reconstruct the full filesystem path.
+    raw_path = parts.netloc + parts.path if parts.netloc else parts.path
+    path_str = unquote(raw_path)
     if path_str.endswith("/") and len(path_str) > 1:
         path_str = path_str[:-1]
     return Path(path_str)

@@ -27,6 +27,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from lightrag.base import DocProcessingStatus, DocStatus
 from lightrag.constants import (
     FULL_DOCS_FORMAT_LIGHTRAG,
@@ -2032,6 +2034,151 @@ class _PipelineMixin:
     # Single-document state machine
     # ============================================================
 
+    async def _embed_document_images(
+        self,
+        doc_id: str,
+        file_path: str,
+        content_data: dict,
+    ) -> None:
+        """Generate CLIP embeddings for images extracted during parsing.
+
+        Reads the sidecar ``drawings.json`` and ``.blocks.assets/`` directory,
+        embeds each image, and upserts the results into ``images_vdb``.
+        """
+        try:
+            sidecar_uri = (
+                content_data.get("sidecar_location")
+                or content_data.get("sidecar_uri")
+                if isinstance(content_data, dict)
+                else None
+            )
+            if not sidecar_uri:
+                logger.warning(f"[img-embed] no sidecar_uri for {doc_id}")
+                return
+            logger.info(f"[img-embed] sidecar_uri={sidecar_uri} for {doc_id}")
+
+            from lightrag.utils_pipeline import sidecar_blocks_path
+            from pathlib import Path
+
+            blocks_path_raw = sidecar_blocks_path(sidecar_uri)
+            if not blocks_path_raw:
+                logger.warning(f"[img-embed] no blocks file in sidecar {sidecar_uri} for {doc_id}")
+                return
+            blocks_path = Path(blocks_path_raw)
+            if not blocks_path.exists():
+                logger.warning(f"[img-embed] blocks path not found: {blocks_path} for {doc_id}")
+                return
+
+            blocks_dir = blocks_path.parent
+
+            # Check drawings.json for image metadata
+            drawings_file = blocks_dir / f"{blocks_path.stem.replace('.blocks', '')}.drawings.json"
+            if not drawings_file.exists():
+                logger.warning(f"[img-embed] no drawings.json at {drawings_file} for {doc_id}")
+                return
+
+            import json as _json
+            with open(drawings_file, "r", encoding="utf-8") as f:
+                drawings_data = _json.load(f)
+
+            drawings = drawings_data.get("drawings", {})
+            if not drawings:
+                logger.warning(f"[img-embed] no drawings found in drawings.json for {doc_id}")
+                return
+
+            image_paths = []
+            image_metas = []
+
+            for drawing_id, drawing in drawings.items():
+                img_rel_path = drawing.get("path", "")
+                if not img_rel_path:
+                    continue
+                img_abs_path = (blocks_dir / img_rel_path).resolve()
+                if not img_abs_path.exists():
+                    continue
+
+                extras = drawing.get("extras", {})
+                ocr_text = (extras.get("ocr_texts") or "").strip()
+                caption = (drawing.get("caption") or "").strip()
+                heading = (drawing.get("heading") or "").strip()
+                # Prefer caption/heading over raw OCR; clean OCR by taking first 2 lines
+                ocr_clean = "\n".join(ocr_text.split("\n")[:3]) if ocr_text else ""
+                description = caption or heading or ocr_clean or "image"
+                # Shorter OCR for embedding context
+                ocr_short = ocr_text[:200] if ocr_text else ""
+
+                image_paths.append(str(img_abs_path))
+                image_metas.append({
+                    "drawing_id": drawing_id,
+                    "caption": caption,
+                    "heading": heading,
+                    "description": description,
+                    "ocr_text": ocr_short,
+                    "image_type": "Drawing",
+                })
+
+            if not image_paths:
+                return
+
+            # Generate text embeddings for image descriptions using bge-m3
+            # (same embedding space as text chunks, so queries can match both)
+            descriptions = [meta["description"][:500] or "image" for meta in image_metas]
+
+            logger.info(
+                f"Embedding {len(descriptions)} image descriptions for doc {doc_id}"
+            )
+
+            embeddings = await self.embedding_func(descriptions)
+            if isinstance(embeddings, list):
+                embeddings = np.array(embeddings)
+
+            # Upload images to MinIO and collect URLs
+            from lightrag.kg.minio_storage import upload_image, is_minio_available
+
+            minio_urls = []
+            if is_minio_available():
+                for img_path in image_paths:
+                    obj_name = f"{doc_id}/{Path(img_path).name}"
+                    url = upload_image(img_path, object_name=obj_name)
+                    minio_urls.append(url or img_path)
+            else:
+                minio_urls = list(image_paths)
+
+            import hashlib
+
+            insert_data = {}
+            for i, (img_path, emb, meta) in enumerate(
+                zip(image_paths, embeddings, image_metas)
+            ):
+                if np.allclose(emb, 0):
+                    continue
+                img_id = hashlib.md5(
+                    f"{doc_id}:{meta['drawing_id']}".encode()
+                ).hexdigest()
+                # Store MinIO URL as primary, local path as fallback
+                image_url = minio_urls[i] if i < len(minio_urls) else img_path
+                insert_data[img_id] = {
+                    "__vector__": emb,
+                    "content": meta.get("description", "image")[:300],
+                    "doc_id": doc_id,
+                    "file_path": file_path,
+                    "image_path": image_url,
+                    "caption": meta.get("caption", ""),
+                    "description": meta.get("description", "image")[:300],
+                    "image_type": meta.get("image_type", "Drawing"),
+                    "tokens": 0,
+                    "chunk_order_index": i,
+                    "full_doc_id": doc_id,
+                }
+
+            if insert_data:
+                await self.images_vdb.upsert(insert_data)
+                logger.info(
+                    f"Embedded {len(insert_data)} images for {file_path}"
+                )
+        except Exception as e:
+            logger.warning(f"Image embedding failed for {doc_id}: {e}")
+
     async def process_single_document(
         self,
         *,
@@ -2140,6 +2287,13 @@ class _PipelineMixin:
                     content_data=content_data,
                     pipeline_status=ctx.pipeline_status,
                     pipeline_status_lock=ctx.pipeline_status_lock,
+                )
+
+                # Image embedding: process extracted images from sidecar assets
+                await self._embed_document_images(
+                    doc_id=doc_id,
+                    file_path=file_path,
+                    content_data=content_data,
                 )
 
                 # Chunker dispatch is driven by whether ``process_options``
