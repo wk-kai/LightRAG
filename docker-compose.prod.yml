@@ -49,7 +49,7 @@ services:
       DOCLING_ENDPOINT: "http://host.docker.internal:5001"
       MAX_PARALLEL_PARSE_DOCLING: "4"
       # --- MinIO ---
-      MINIO_ENDPOINT: "host.docker.internal:9000"
+      MINIO_ENDPOINT: "106.15.102.66:9000"
       MINIO_ACCESS_KEY: "admin"
       MINIO_SECRET_KEY: "Superv@1"
       MINIO_BUCKET: "lightrag-images"
