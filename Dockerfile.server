@@ -2,12 +2,13 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
     curl unzip ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# uv
-RUN pip install uv
+# uv (with mirror for China)
+RUN pip install uv -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
 
 # bun
 RUN curl -fsSL https://bun.sh/install | bash
