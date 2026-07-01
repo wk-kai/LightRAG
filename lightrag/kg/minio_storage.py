@@ -88,7 +88,7 @@ def upload_image(local_path: str | Path, object_name: Optional[str] = None) -> O
         # from the current MINIO_ENDPOINT env var so the same data works across
         # different hosts (local Docker, remote server, etc.).
         logical_path = f"minio://{_minio_bucket}/{object_name}"
-        logger.debug(f"Uploaded to MinIO: {logical_path}")
+        logger.info(f"Uploaded to MinIO: {logical_path}")
         return logical_path
     except Exception as e:
         logger.warning(f"MinIO upload failed for {local_path}: {e}")

@@ -2137,11 +2137,14 @@ class _PipelineMixin:
 
             minio_urls = []
             if is_minio_available():
+                logger.info(f"[img-embed] Uploading {len(image_paths)} images to MinIO for doc {doc_id}")
                 for img_path in image_paths:
                     obj_name = f"{doc_id}/{Path(img_path).name}"
                     url = upload_image(img_path, object_name=obj_name)
                     minio_urls.append(url or img_path)
+                logger.info(f"[img-embed] Upload complete: {len(minio_urls)} URLs collected for {doc_id}")
             else:
+                logger.info(f"[img-embed] MinIO unavailable, using local paths for {doc_id}")
                 minio_urls = list(image_paths)
 
             import hashlib
