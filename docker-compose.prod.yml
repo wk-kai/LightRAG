@@ -23,7 +23,7 @@ services:
       # --- LLM: Ollama (host.docker.internal) ---
       LLM_BINDING: "ollama"
       LLM_BINDING_HOST: "http://host.docker.internal:11434"
-      LLM_MODEL: "qwen3.5:4b"
+      LLM_MODEL: "qwen2.5:7b"
       MAX_ASYNC: "6"
       LLM_TIMEOUT: "240"
       # --- Embedding: Ollama (host.docker.internal) ---
