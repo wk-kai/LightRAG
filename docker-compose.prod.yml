@@ -57,6 +57,7 @@ services:
       VLM_LLM_BINDING: "ollama"
       VLM_LLM_BINDING_HOST: "http://host.docker.internal:11434"
       VLM_LLM_MODEL: "qwen3-vl:latest"
+      VLM_LLM_BINDING_API_KEY: ""
       VLM_MAX_ASYNC_LLM: "4"
       VLM_LLM_TIMEOUT: "300"
       # --- Query ---
