@@ -2101,9 +2101,11 @@ class _PipelineMixin:
                 ocr_text = (extras.get("ocr_texts") or "").strip()
                 caption = (drawing.get("caption") or "").strip()
                 heading = (drawing.get("heading") or "").strip()
-                # Prefer caption/heading over raw OCR; clean OCR by taking first 2 lines
+                # VLM-generated description (from qwen3-vl) takes priority
+                vlm_description = (drawing.get("description") or "").strip()
+                # Prefer VLM > caption > heading > OCR; clean OCR by taking first 2 lines
                 ocr_clean = "\n".join(ocr_text.split("\n")[:3]) if ocr_text else ""
-                description = caption or heading or ocr_clean or "image"
+                description = vlm_description or caption or heading or ocr_clean or "image"
                 # Shorter OCR for embedding context
                 ocr_short = ocr_text[:200] if ocr_text else ""
 
