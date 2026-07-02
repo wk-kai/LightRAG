@@ -217,10 +217,21 @@ const StatusCard = ({ status }: { status: LightragStatus | null }) => {
             )
           })()}
           <span>MCP:</span>
-          <span>
+          <span className="flex items-center gap-1">
             {status.configuration.mcp?.enabled
               ? `✅ ${status.configuration.mcp.endpoint} (${status.configuration.mcp.tools?.length ?? '?'} tools)`
               : '❌ Disabled'}
+            {status.configuration.mcp?.enabled && status.configuration.mcp?.config_json && (
+              <button
+                className="ml-1 px-1 py-0.5 text-xs rounded hover:bg-muted-foreground/20 transition-colors"
+                title="Copy MCP config JSON"
+                onClick={() => {
+                  navigator.clipboard.writeText(status.configuration.mcp!.config_json!)
+                }}
+              >
+                📋
+              </button>
+            )}
           </span>
           <span>{t('graphPanel.statusCard.otherSettings')}:</span>
           <span>

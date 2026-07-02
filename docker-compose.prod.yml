@@ -13,7 +13,6 @@ services:
     volumes:
       - ./rag_storage:/app/rag_storage
       - ./inputs:/app/inputs
-      - ./lightrag.log:/app/lightrag.log
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
