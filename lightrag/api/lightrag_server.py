@@ -2117,6 +2117,31 @@ def create_app(args):
     ollama_api = OllamaAPI(rag, top_k=args.top_k, api_key=api_key)
     app.include_router(ollama_api.router, prefix="/api")
 
+    # --- MCP Server ---
+    from lightrag.api.mcp_server import create_mcp_server
+    from contextlib import asynccontextmanager
+
+    mcp = create_mcp_server(rag, top_k=args.top_k)
+
+    # Integrate MCP session manager lifespan with FastAPI's lifespan
+    _original_lifespan = lifespan
+
+    @asynccontextmanager
+    async def _combined_lifespan(app: FastAPI):
+        async with mcp.session_manager.run():
+            async with _original_lifespan(app):
+                yield
+
+    app.router.lifespan_context = _combined_lifespan
+
+    # Mount MCP as a sub-application at /mcp
+    from starlette.routing import Mount
+    app.router.routes.append(
+        Mount("/mcp", app=mcp.streamable_http_app())
+    )
+    logger.info("MCP server mounted at /mcp")
+    # --- End MCP Server ---
+
     # Custom Swagger UI endpoint for offline support
     @app.get("/docs", include_in_schema=False)
     async def custom_swagger_ui_html(request: Request):
