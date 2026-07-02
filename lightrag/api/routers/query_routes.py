@@ -520,9 +520,11 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
 
                 response_stream = llm_response.get("response_iterator")
                 if response_stream:
+                    streamed_text = ""
                     try:
                         async for chunk in response_stream:
                             if chunk:
+                                streamed_text += chunk
                                 yield f"{json.dumps({'response': chunk})}\n"
                     except Exception as e:
                         logger.error(f"Streaming error: {str(e)}")
@@ -531,7 +533,6 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     # After stream, yield image chunks from cited documents only,
                     # skipping any whose caption already appears in the streamed text.
                     try:
-                        full_response = llm_response.get("content", "") or ""
                         chunks = result.get("data", {}).get("chunks", [])
                         referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
                         for c in chunks:
@@ -539,10 +540,10 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                                 continue
                             if not referenced_files or c.get("file_path", "") in referenced_files:
                                 img_content = c["content"]
-                                if img_content in full_response:
+                                if img_content in streamed_text:
                                     continue
                                 caption = img_content.split("](")[0].lstrip("![") if "](" in img_content else ""
-                                if caption and caption in full_response:
+                                if caption and caption in streamed_text:
                                     continue
                                 yield f"{json.dumps({'response': img_content})}\n"
                     except Exception as e:
