@@ -444,14 +444,17 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     enriched_references.append(ref_copy)
                 references = enriched_references
 
-            # Append image chunks not already in the LLM response
+            # Append image chunks not already in the LLM response,
+            # but only from documents actually cited by the LLM
             chunks = data.get("chunks", [])
+            referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
             unused_images = [
                 c["content"] for c in chunks
                 if c.get("source_type") == "image"
                 and c.get("image_path")
                 and c.get("content", "")
                 and c["content"] not in response_content
+                and (not referenced_files or c.get("file_path", "") in referenced_files)
             ]
             if unused_images:
                 response_content = (
@@ -520,13 +523,15 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                         logger.error(f"Streaming error: {str(e)}")
                         yield f"{json.dumps({'error': str(e)})}\n"
 
-                    # After stream, yield image chunks not already in the response
+                    # After stream, yield image chunks from cited documents only
                     chunks = result.get("data", {}).get("chunks", [])
+                    referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
                     for c in chunks:
                         if (
                             c.get("source_type") == "image"
                             and c.get("image_path")
                             and c.get("content", "")
+                            and (not referenced_files or c.get("file_path", "") in referenced_files)
                         ):
                             yield f"{json.dumps({'response': c['content']})}\n"
             else:
@@ -535,14 +540,17 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 if not response_content:
                     response_content = "No relevant context found for the query."
 
-                # Append image chunks not already in the LLM response
+                # Append image chunks not already in the LLM response,
+                # but only from documents actually cited by the LLM
                 chunks = result.get("data", {}).get("chunks", [])
+                referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
                 unused_images = [
                     c["content"] for c in chunks
                     if c.get("source_type") == "image"
                     and c.get("image_path")
                     and c.get("content", "")
                     and c["content"] not in response_content
+                    and (not referenced_files or c.get("file_path", "") in referenced_files)
                 ]
                 if unused_images:
                     response_content = (

@@ -85,14 +85,18 @@ def create_mcp_server(rag, top_k: int = 60):
         llm_response = result.get("llm_response", {})
         response_text = llm_response.get("content", "") or str(result)
 
-        # Append image chunks not already in the LLM response
+        # Append image chunks not already in the LLM response,
+        # but only from documents actually cited by the LLM
         chunks = result.get("data", {}).get("chunks", [])
+        references = result.get("data", {}).get("references", [])
+        referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
         unused_images = [
             c["content"] for c in chunks
             if c.get("source_type") == "image"
             and c.get("image_path")
             and c.get("content", "")
             and c["content"] not in response_text
+            and (not referenced_files or c.get("file_path", "") in referenced_files)
         ]
         if unused_images:
             response_text += "\n\n---\n### Related Images\n\n" + "\n\n".join(unused_images)
