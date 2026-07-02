@@ -2391,6 +2391,26 @@ def create_app(args):
                         "enable_llm_cache_for_extract": args.enable_llm_cache_for_extract,
                         "enable_llm_cache": args.enable_llm_cache,
                         "vlm_process_enable": args.vlm_process_enable,
+                        "mcp": {
+                            "enabled": True,
+                            "endpoint": "/mcp",
+                            "tools": [
+                                "lightrag_query",
+                                "lightrag_insert_text",
+                                "lightrag_get_graph_info",
+                            ],
+                            "config_json": json.dumps(
+                                {
+                                    "mcpServers": {
+                                        "lightrag": {
+                                            "type": "streamable-http",
+                                            "url": f"http://<host>:{args.port}/mcp",
+                                        }
+                                    }
+                                },
+                                indent=2,
+                            ),
+                        },
                         "workspace": default_workspace,
                         "storage_workspaces": _get_storage_workspaces(rag),
                         "max_graph_nodes": args.max_graph_nodes,
