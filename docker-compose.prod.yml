@@ -24,7 +24,7 @@ services:
       LLM_BINDING: "openai"
       LLM_BINDING_HOST: "https://api.deepseek.com"
       LLM_BINDING_API_KEY: "sk-ed9b4c34f6b844b09f9b0ca909808223"
-      LLM_MODEL: "deepseek-chat"
+      LLM_MODEL: "deepseek-v4-flash"
       MAX_ASYNC: "6"
       LLM_TIMEOUT: "240"
       # --- Embedding: Ollama (host.docker.internal) ---
