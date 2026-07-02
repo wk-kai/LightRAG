@@ -30,6 +30,9 @@ RUN uv sync --extra api --extra offline-storage --no-dev
 # Force install ollama + minio into venv (pipmaster fails at runtime in Docker)
 RUN uv pip install ollama minio
 
+# Pre-warm tiktoken cache (openaipublic.blob.core.windows.net blocked in China)
+RUN .venv/bin/python -c "import tiktoken; tiktoken.get_encoding('o200k_base'); print('tiktoken warm OK')"
+
 # --- Frontend ---
 COPY lightrag_webui/package.json lightrag_webui/bun.lock* lightrag_webui/
 COPY lightrag_webui/vite.config.ts lightrag_webui/tsconfig*.json lightrag_webui/index.html lightrag_webui/
