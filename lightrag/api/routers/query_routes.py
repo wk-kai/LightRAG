@@ -528,17 +528,23 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                         logger.error(f"Streaming error: {str(e)}")
                         yield f"{json.dumps({'error': str(e)})}\n"
 
-                    # After stream, yield image chunks from cited documents only
+                    # After stream, yield image chunks from cited documents only,
+                    # skipping any whose caption already appears in the streamed text.
+                    # We rebuild the full LLM response from chunks already yielded.
+                    full_response = llm_response.get("content", "")
                     chunks = result.get("data", {}).get("chunks", [])
                     referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
                     for c in chunks:
-                        if (
-                            c.get("source_type") == "image"
-                            and c.get("image_path")
-                            and c.get("content", "")
-                            and (not referenced_files or c.get("file_path", "") in referenced_files)
-                        ):
-                            yield f"{json.dumps({'response': c['content']})}\n"
+                        if not (c.get("source_type") == "image" and c.get("image_path") and c.get("content", "")):
+                            continue
+                        if not referenced_files or c.get("file_path", "") in referenced_files:
+                            img_content = c["content"]
+                            if img_content in full_response:
+                                continue
+                            caption = img_content.split("](")[0].lstrip("![") if "](" in img_content else ""
+                            if caption and caption in full_response:
+                                continue
+                            yield f"{json.dumps({'response': img_content})}\n"
             else:
                 # Non-streaming: complete response in one message
                 response_content = llm_response.get("content", "")
