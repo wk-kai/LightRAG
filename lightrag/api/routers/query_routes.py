@@ -448,14 +448,19 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             # but only from documents actually cited by the LLM
             chunks = data.get("chunks", [])
             referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
-            unused_images = [
-                c["content"] for c in chunks
-                if c.get("source_type") == "image"
-                and c.get("image_path")
-                and c.get("content", "")
-                and c["content"] not in response_content
-                and (not referenced_files or c.get("file_path", "") in referenced_files)
-            ]
+            unused_images = []
+            for c in chunks:
+                if not (c.get("source_type") == "image" and c.get("image_path") and c.get("content", "")):
+                    continue
+                if not referenced_files or c.get("file_path", "") in referenced_files:
+                    img_content = c["content"]  # "![caption](url)"
+                    if img_content in response_content:
+                        continue  # exact match — LLM embedded this image
+                    # Also skip if caption text already appears in the response
+                    caption = img_content.split("](")[0].lstrip("![") if "](" in img_content else ""
+                    if caption and caption in response_content:
+                        continue
+                    unused_images.append(img_content)
             if unused_images:
                 response_content = (
                     response_content
@@ -544,14 +549,18 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                 # but only from documents actually cited by the LLM
                 chunks = result.get("data", {}).get("chunks", [])
                 referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
-                unused_images = [
-                    c["content"] for c in chunks
-                    if c.get("source_type") == "image"
-                    and c.get("image_path")
-                    and c.get("content", "")
-                    and c["content"] not in response_content
-                    and (not referenced_files or c.get("file_path", "") in referenced_files)
-                ]
+                unused_images = []
+                for c in chunks:
+                    if not (c.get("source_type") == "image" and c.get("image_path") and c.get("content", "")):
+                        continue
+                    if not referenced_files or c.get("file_path", "") in referenced_files:
+                        img_content = c["content"]
+                        if img_content in response_content:
+                            continue
+                        caption = img_content.split("](")[0].lstrip("![") if "](" in img_content else ""
+                        if caption and caption in response_content:
+                            continue
+                        unused_images.append(img_content)
                 if unused_images:
                     response_content = (
                         response_content

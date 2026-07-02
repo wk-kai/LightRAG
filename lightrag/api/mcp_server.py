@@ -90,14 +90,18 @@ def create_mcp_server(rag, top_k: int = 60):
         chunks = result.get("data", {}).get("chunks", [])
         references = result.get("data", {}).get("references", [])
         referenced_files = {r.get("file_path", "") for r in references if r.get("file_path")}
-        unused_images = [
-            c["content"] for c in chunks
-            if c.get("source_type") == "image"
-            and c.get("image_path")
-            and c.get("content", "")
-            and c["content"] not in response_text
-            and (not referenced_files or c.get("file_path", "") in referenced_files)
-        ]
+        unused_images = []
+        for c in chunks:
+            if not (c.get("source_type") == "image" and c.get("image_path") and c.get("content", "")):
+                continue
+            if not referenced_files or c.get("file_path", "") in referenced_files:
+                img_content = c["content"]
+                if img_content in response_text:
+                    continue
+                caption = img_content.split("](")[0].lstrip("![") if "](" in img_content else ""
+                if caption and caption in response_text:
+                    continue
+                unused_images.append(img_content)
         if unused_images:
             response_text += "\n\n---\n### Related Images\n\n" + "\n\n".join(unused_images)
 
