@@ -20,11 +20,10 @@ services:
       PORT: "9621"
       WORKING_DIR: "/app/rag_storage"
       INPUT_DIR: "/app/inputs"
-      # --- LLM: DeepSeek ---
-      LLM_BINDING: "openai"
-      LLM_BINDING_HOST: "https://api.deepseek.com"
-      LLM_BINDING_API_KEY: "your_deepseek_key_here"
-      LLM_MODEL: "deepseek-chat"
+      # --- LLM: Ollama (host.docker.internal) ---
+      LLM_BINDING: "ollama"
+      LLM_BINDING_HOST: "http://host.docker.internal:11434"
+      LLM_MODEL: "qwen3.5:4b"
       MAX_ASYNC: "6"
       LLM_TIMEOUT: "240"
       # --- Embedding: Ollama (host.docker.internal) ---
@@ -54,10 +53,9 @@ services:
       MINIO_BUCKET: "lightrag-images"
       # --- VLM ---
       VLM_PROCESS_ENABLE: "true"
-      VLM_LLM_BINDING: "openai"
-      VLM_LLM_BINDING_HOST: "https://api.deepseek.com"
-      VLM_LLM_BINDING_API_KEY: "your_deepseek_key_here"
-      VLM_LLM_MODEL: "deepseek-chat"
+      VLM_LLM_BINDING: "ollama"
+      VLM_LLM_BINDING_HOST: "http://host.docker.internal:11434"
+      VLM_LLM_MODEL: "qwen3-vl:latest"
       VLM_MAX_ASYNC_LLM: "4"
       VLM_LLM_TIMEOUT: "300"
       # --- Query ---
