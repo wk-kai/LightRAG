@@ -609,7 +609,7 @@ def parse_args() -> argparse.Namespace:
             if not role_host:
                 role_host = get_default_host(role_binding)
                 setattr(args, f"{attr_prefix}_llm_binding_host", role_host)
-            if role_binding != "bedrock" and not role_apikey:
+            if role_binding not in ("bedrock", "ollama") and not role_apikey:
                 missing.append(apikey_key)
             if missing:
                 raise SystemExit(
