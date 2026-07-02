@@ -81,8 +81,23 @@ def create_mcp_server(rag, top_k: int = 60):
             chunk_top_k=max_results,
             stream=False,
         )
-        result = await rag.aquery(query, param=param)
-        return str(result)
+        result = await rag.aquery_llm(query, param=param)
+        llm_response = result.get("llm_response", {})
+        response_text = llm_response.get("content", "") or str(result)
+
+        # Append image chunks not already in the LLM response
+        chunks = result.get("data", {}).get("chunks", [])
+        unused_images = [
+            c["content"] for c in chunks
+            if c.get("source_type") == "image"
+            and c.get("image_path")
+            and c.get("content", "")
+            and c["content"] not in response_text
+        ]
+        if unused_images:
+            response_text += "\n\n---\n### Related Images\n\n" + "\n\n".join(unused_images)
+
+        return response_text
 
     @mcp.tool()
     async def lightrag_insert_text(
