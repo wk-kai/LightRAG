@@ -2119,7 +2119,6 @@ def create_app(args):
 
     # --- MCP Server ---
     from lightrag.api.mcp_server import create_mcp_server
-    from contextlib import asynccontextmanager
 
     mcp = create_mcp_server(rag, top_k=args.top_k)
 
