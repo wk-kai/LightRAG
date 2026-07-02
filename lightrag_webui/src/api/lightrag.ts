@@ -119,6 +119,12 @@ export type LightragStatus = {
         do_formula_enrichment?: boolean
       }
     }
+    mcp?: {
+      enabled: boolean
+      endpoint: string
+      tools: string[]
+      config_json: string
+    }
   }
   update_status?: Record<string, any>
   core_version?: string

@@ -216,6 +216,12 @@ const StatusCard = ({ status }: { status: LightragStatus | null }) => {
               </span>
             )
           })()}
+          <span>MCP:</span>
+          <span>
+            {status.configuration.mcp?.enabled
+              ? `✅ ${status.configuration.mcp.endpoint} (${status.configuration.mcp.tools?.length ?? '?'} tools)`
+              : '❌ Disabled'}
+          </span>
           <span>{t('graphPanel.statusCard.otherSettings')}:</span>
           <span>
             {status.configuration.summary_language}
