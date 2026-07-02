@@ -444,6 +444,22 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     enriched_references.append(ref_copy)
                 references = enriched_references
 
+            # Append image chunks not already in the LLM response
+            chunks = data.get("chunks", [])
+            unused_images = [
+                c["content"] for c in chunks
+                if c.get("source_type") == "image"
+                and c.get("image_path")
+                and c.get("content", "")
+                and c["content"] not in response_content
+            ]
+            if unused_images:
+                response_content = (
+                    response_content
+                    + "\n\n---\n### Related Images\n\n"
+                    + "\n\n".join(unused_images)
+                )
+
             # Return response with or without references based on request
             if request.include_references:
                 return QueryResponse(response=response_content, references=references)
@@ -503,11 +519,37 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     except Exception as e:
                         logger.error(f"Streaming error: {str(e)}")
                         yield f"{json.dumps({'error': str(e)})}\n"
+
+                    # After stream, yield image chunks not already in the response
+                    chunks = result.get("data", {}).get("chunks", [])
+                    for c in chunks:
+                        if (
+                            c.get("source_type") == "image"
+                            and c.get("image_path")
+                            and c.get("content", "")
+                        ):
+                            yield f"{json.dumps({'response': c['content']})}\n"
             else:
                 # Non-streaming: complete response in one message
                 response_content = llm_response.get("content", "")
                 if not response_content:
                     response_content = "No relevant context found for the query."
+
+                # Append image chunks not already in the LLM response
+                chunks = result.get("data", {}).get("chunks", [])
+                unused_images = [
+                    c["content"] for c in chunks
+                    if c.get("source_type") == "image"
+                    and c.get("image_path")
+                    and c.get("content", "")
+                    and c["content"] not in response_content
+                ]
+                if unused_images:
+                    response_content = (
+                        response_content
+                        + "\n\n---\n### Related Images\n\n"
+                        + "\n\n".join(unused_images)
+                    )
 
                 complete_response = {"response": response_content}
                 if include_references:
