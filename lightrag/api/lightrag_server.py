@@ -2439,7 +2439,7 @@ def create_app(args):
                                     "mcpServers": {
                                         "lightrag": {
                                             "type": "http",
-                                            "url": f"http://{request.headers.get('host', f'localhost:{args.port}').split(':')[0]}:{args.port}/mcp/mcp",
+                                            "url": f"http://{request.headers.get('host', f'localhost:{args.port}').split(':')[0]}:{args.port}/mcp",
                                         }
                                     }
                                 },
