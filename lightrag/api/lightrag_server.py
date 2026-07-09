@@ -2133,14 +2133,20 @@ def create_app(args):
 
     app.router.lifespan_context = _combined_lifespan
 
-    # Mount MCP at /mcp.  The streamable-http endpoint is reachable at
-    # /mcp/mcp (POST) and /mcp (GET health discovery).
+    # MCP health-discovery route.  Must be registered before the Mount so
+    # GET /mcp returns 200 (Streamable HTTP signal) instead of the Mount's
+    # 307 redirect → 404 which MCP clients misinterpret as SSE.
+    @app.get("/mcp", include_in_schema=False)
+    async def mcp_discovery():
+        return JSONResponse({"status": "ok", "transport": "streamable-http"})
+
+    # Mount MCP sub-app at /mcp → real endpoint is at /mcp/mcp (POST).
     from starlette.routing import Mount
 
     app.router.routes.append(
         Mount("/mcp", app=mcp.streamable_http_app())
     )
-    logger.info("MCP server mounted at /mcp → endpoint /mcp/mcp")
+    logger.info("MCP server mounted at /mcp/mcp")
 
     # Custom Swagger UI endpoint for offline support
     @app.get("/docs", include_in_schema=False)
