@@ -2133,50 +2133,14 @@ def create_app(args):
 
     app.router.lifespan_context = _combined_lifespan
 
-    # Mount MCP at /mcp — raw ASGI routing to avoid Mount's 307 redirect
-    # (which causes MCP clients to misdetect the transport as SSE).
-    mcp_app = mcp.streamable_http_app()
-    mcp_prefix = "/mcp"
+    # Mount MCP at /mcp.  The streamable-http endpoint is reachable at
+    # /mcp/mcp (POST) and /mcp (GET health discovery).
+    from starlette.routing import Mount
 
-    @app.middleware("http")
-    async def _mcp_middleware(request: Request, call_next):
-        if request.url.path.startswith(mcp_prefix):
-            body_bytes = await request.body()
-            scope = dict(request.scope)
-            scope["path"] = request.url.path[len(mcp_prefix):] or "/"
-            scope["root_path"] = request.scope.get("root_path", "") + mcp_prefix
-
-            body_returned = False
-            async def _receive():
-                nonlocal body_returned
-                if body_returned:
-                    return {"type": "http.request", "body": b"", "more_body": False}
-                body_returned = True
-                return {"type": "http.request", "body": body_bytes, "more_body": False}
-
-            status = None
-            headers = []
-            body_chunks = []
-            async def _send(message):
-                nonlocal status
-                if message["type"] == "http.response.start":
-                    status = message["status"]
-                    headers[:] = message["headers"]
-                elif message["type"] == "http.response.body":
-                    body_chunks.append(message.get("body", b""))
-
-            await mcp_app(scope, _receive, _send)
-            if status is None:
-                return await call_next(request)
-
-            body = b"".join(body_chunks)
-            resp_headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in headers}
-            resp_headers.pop("content-length", None)
-            resp_headers.pop("transfer-encoding", None)
-            return Response(content=body, status_code=status, headers=resp_headers)
-        return await call_next(request)
-
-    logger.info("MCP server active at /mcp")
+    app.router.routes.append(
+        Mount("/mcp", app=mcp.streamable_http_app())
+    )
+    logger.info("MCP server mounted at /mcp → endpoint /mcp/mcp")
 
     # Custom Swagger UI endpoint for offline support
     @app.get("/docs", include_in_schema=False)
