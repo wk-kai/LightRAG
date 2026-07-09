@@ -2404,8 +2404,8 @@ def create_app(args):
                                 {
                                     "mcpServers": {
                                         "lightrag": {
-                                            "type": "streamable-http",
-                                            "url": f"http://<host>:{args.port}/mcp",
+                                            "type": "http",
+                                            "url": f"http://{request.headers.get('host', f'localhost:{args.port}').split(':')[0]}:{args.port}/mcp/mcp",
                                         }
                                     }
                                 },
