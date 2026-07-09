@@ -2136,22 +2136,10 @@ def create_app(args):
     # Mount MCP as a sub-application at /mcp
     from starlette.routing import Mount
 
-    # GET /mcp health check for MCP client discovery (must be before Mount)
-    @app.get("/mcp")
-    async def mcp_health():
-        return {"status": "ok", "endpoint": "/mcp/mcp"}
-
-    # Streamable HTTP transport (for clients supporting it)
-    mcp_app = mcp.streamable_http_app()
     app.router.routes.append(
-        Mount("/mcp", app=mcp_app)
+        Mount("/mcp", app=mcp.streamable_http_app())
     )
-
-    # SSE transport (for clients that only support SSE)
-    app.router.routes.append(
-        Mount("/mcpsse", app=mcp.sse_app())
-    )
-    logger.info("MCP server mounted at /mcp (streamable-http) and /mcpsse (SSE)")
+    logger.info("MCP server mounted at /mcp")
 
     # Custom Swagger UI endpoint for offline support
     @app.get("/docs", include_in_schema=False)
