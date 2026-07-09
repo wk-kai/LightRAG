@@ -2133,13 +2133,19 @@ def create_app(args):
 
     app.router.lifespan_context = _combined_lifespan
 
-    # Mount MCP as a sub-application at /mcp
-    from starlette.routing import Mount
+    # Proxy /mcp to the MCP streamable HTTP app without Mount redirect
+    mcp_asgi = mcp.streamable_http_app()
 
-    app.router.routes.append(
-        Mount("/mcp", app=mcp.streamable_http_app())
-    )
-    logger.info("MCP server mounted at /mcp")
+    @app.middleware("http")
+    async def _mcp_middleware(request: Request, call_next):
+        if request.url.path == "/mcp" and request.method == "GET":
+            # Respond to discovery GET so clients detect Streamable HTTP, not SSE
+            return JSONResponse({"status": "ok", "transport": "streamable-http"})
+        if request.url.path.startswith("/mcp"):
+            return await mcp_asgi(request.scope, request.receive, request._send)
+        return await call_next(request)
+
+    logger.info("MCP server proxy active at /mcp")
 
     # Custom Swagger UI endpoint for offline support
     @app.get("/docs", include_in_schema=False)
