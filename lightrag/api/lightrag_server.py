@@ -2133,19 +2133,48 @@ def create_app(args):
 
     app.router.lifespan_context = _combined_lifespan
 
-    # Proxy /mcp to the MCP streamable HTTP app without Mount redirect
-    mcp_asgi = mcp.streamable_http_app()
+    # Mount MCP at /mcp with raw ASGI middleware — avoids Starlette Mount's
+    # 307 redirect that confuses MCP clients into thinking the endpoint is SSE.
+    mcp_app = mcp.streamable_http_app()
+    mcp_prefix = "/mcp"
 
     @app.middleware("http")
     async def _mcp_middleware(request: Request, call_next):
-        if request.url.path == "/mcp" and request.method == "GET":
-            # Respond to discovery GET so clients detect Streamable HTTP, not SSE
-            return JSONResponse({"status": "ok", "transport": "streamable-http"})
-        if request.url.path.startswith("/mcp"):
-            return await mcp_asgi(request.scope, request.receive, request._send)
+        if request.url.path.startswith(mcp_prefix):
+            # Rewrite path for the sub-app and forward
+            scope = dict(request.scope)
+            stripped = request.url.path[len(mcp_prefix):] or "/"
+            scope["path"] = stripped
+            scope["raw_path"] = stripped.encode()
+            scope["root_path"] = request.scope.get("root_path", "") + mcp_prefix
+            # Capture response from mcp_app
+            body_chunks = []
+            status_code = 200
+            resp_headers = []
+
+            async def _receive():
+                return await request.receive()
+
+            async def _capture_send(message):
+                nonlocal status_code
+                if message["type"] == "http.response.start":
+                    status_code = message["status"]
+                    resp_headers[:] = message["headers"]
+                elif message["type"] == "http.response.body":
+                    body_chunks.append(message.get("body", b""))
+
+            await mcp_app(scope, _receive, _capture_send)
+
+            body = b"".join(body_chunks)
+            headers = {k.decode(): v.decode() for k, v in resp_headers}
+            # Remove content-length so Starlette recalculates
+            headers.pop("content-length", None)
+            # Remove transfer-encoding (chunked) so Starlette handles it
+            headers.pop("transfer-encoding", None)
+            return Response(content=body, status_code=status_code, headers=headers)
         return await call_next(request)
 
-    logger.info("MCP server proxy active at /mcp")
+    logger.info("MCP server active at /mcp")
 
     # Custom Swagger UI endpoint for offline support
     @app.get("/docs", include_in_schema=False)
