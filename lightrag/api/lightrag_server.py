@@ -2135,7 +2135,7 @@ def create_app(args):
 
     # Mount MCP at /mcp — raw ASGI routing to avoid Mount's 307 redirect
     # (which causes MCP clients to misdetect the transport as SSE).
-    mcp_app = mcp.streamable_http_app(streamable_http_path="")
+    mcp_app = mcp.streamable_http_app()
     mcp_prefix = "/mcp"
 
     @app.middleware("http")
