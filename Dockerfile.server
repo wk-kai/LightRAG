@@ -2,21 +2,17 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl unzip ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# uv (use Aliyun mirror for China)
-ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+# uv
 RUN pip install uv
 
-# Node.js (NodeSource) + npm (NPMMirror for China)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
-    npm config set registry https://registry.npmmirror.com && \
-    rm -rf /var/lib/apt/lists/*
+# bun (frontend build tool)
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:$PATH"
+RUN bun --version
 
 # --- Source (needed for build) ---
 COPY lightrag/ lightrag/
@@ -25,18 +21,14 @@ COPY pyproject.toml uv.lock ./
 
 # --- Python deps ---
 RUN uv sync --extra api --extra offline-storage --no-dev
-# Force install ollama + minio into venv (pipmaster fails at runtime in Docker)
 RUN uv pip install ollama minio
 
-# Pre-warm tiktoken cache (openaipublic.blob.core.windows.net blocked in China)
-RUN .venv/bin/python -c "import tiktoken; tiktoken.get_encoding('o200k_base'); print('tiktoken warm OK')"
-
 # --- Frontend ---
-COPY lightrag_webui/package.json lightrag_webui/
+COPY lightrag_webui/package.json lightrag_webui/bun.lock* lightrag_webui/
 COPY lightrag_webui/vite.config.ts lightrag_webui/tsconfig*.json lightrag_webui/index.html lightrag_webui/
 COPY lightrag_webui/src/ lightrag_webui/src/
 COPY lightrag_webui/public/ lightrag_webui/public/
-RUN cd lightrag_webui && npm install && npx vite build && cd ..
+RUN cd lightrag_webui && bun install --frozen-lockfile && bun run build && cd ..
 
 EXPOSE 9621
 CMD [".venv/bin/python", "-m", "lightrag.api.lightrag_server"]
