@@ -2133,20 +2133,48 @@ def create_app(args):
 
     app.router.lifespan_context = _combined_lifespan
 
-    # MCP health-discovery route.  Must be registered before the Mount so
-    # GET /mcp returns 200 (Streamable HTTP signal) instead of the Mount's
-    # 307 redirect → 404 which MCP clients misinterpret as SSE.
+    # MCP Streamable HTTP endpoint at /mcp.  Reasonix sends discovery
+    # GET and initialize POST to the same URL — both must return 200.
+    mcp_asgi = mcp.streamable_http_app()
+
     @app.get("/mcp", include_in_schema=False)
     async def mcp_discovery():
         return JSONResponse({"status": "ok", "transport": "streamable-http"})
 
-    # Mount MCP sub-app at /mcp → real endpoint is at /mcp/mcp (POST).
-    from starlette.routing import Mount
+    @app.post("/mcp", include_in_schema=False)
+    async def mcp_post(request: Request):
+        body_bytes = await request.body()
+        scope = dict(request.scope)
+        scope["path"] = "/mcp"
 
-    app.router.routes.append(
-        Mount("/mcp", app=mcp.streamable_http_app())
-    )
-    logger.info("MCP server mounted at /mcp/mcp")
+        body_returned = False
+        async def _receive():
+            nonlocal body_returned
+            if body_returned:
+                return {"type": "http.request", "body": b"", "more_body": False}
+            body_returned = True
+            return {"type": "http.request", "body": body_bytes, "more_body": False}
+
+        status_code = None
+        resp_headers = []
+        body_chunks = []
+        async def _send(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+                resp_headers[:] = message["headers"]
+            elif message["type"] == "http.response.body":
+                body_chunks.append(message.get("body", b""))
+
+        await mcp_asgi(scope, _receive, _send)
+
+        body = b"".join(body_chunks)
+        headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in resp_headers}
+        headers.pop("content-length", None)
+        headers.pop("transfer-encoding", None)
+        return Response(content=body, status_code=status_code or 200, headers=headers)
+
+    logger.info("MCP server active at /mcp")
 
     # Custom Swagger UI endpoint for offline support
     @app.get("/docs", include_in_schema=False)
