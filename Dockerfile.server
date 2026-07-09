@@ -12,13 +12,10 @@ ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 RUN pip install uv
 
-# bun (via NodeSource + npm mirror for China)
+# npm + nodejs (Aliyun mirror)
 RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm && \
     npm config set registry https://registry.npmmirror.com && \
-    npm install -g bun && \
     rm -rf /var/lib/apt/lists/*
-ENV PATH="/root/.bun/bin:$PATH"
-RUN bun --version
 
 # --- Source (needed for build) ---
 COPY lightrag/ lightrag/
@@ -34,11 +31,11 @@ RUN uv pip install ollama minio
 RUN .venv/bin/python -c "import tiktoken; tiktoken.get_encoding('o200k_base'); print('tiktoken warm OK')"
 
 # --- Frontend ---
-COPY lightrag_webui/package.json lightrag_webui/bun.lock* lightrag_webui/
+COPY lightrag_webui/package.json lightrag_webui/
 COPY lightrag_webui/vite.config.ts lightrag_webui/tsconfig*.json lightrag_webui/index.html lightrag_webui/
 COPY lightrag_webui/src/ lightrag_webui/src/
 COPY lightrag_webui/public/ lightrag_webui/public/
-RUN cd lightrag_webui && bun install --frozen-lockfile && bun run build && cd ..
+RUN cd lightrag_webui && npm install && npx vite build && cd ..
 
 EXPOSE 9621
 CMD [".venv/bin/python", "-m", "lightrag.api.lightrag_server"]
