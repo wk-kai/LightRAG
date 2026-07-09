@@ -12,8 +12,9 @@ ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 RUN pip install uv
 
-# npm + nodejs (Aliyun mirror)
-RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm && \
+# Node.js (NodeSource) + npm (NPMMirror for China)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y nodejs && \
     npm config set registry https://registry.npmmirror.com && \
     rm -rf /var/lib/apt/lists/*
 
